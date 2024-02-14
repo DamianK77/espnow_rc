@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include "espnow_rc.h"
 
-const uint8_t *broadcast_address = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+const uint8_t mac_broadcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
-esp_now_peer_info_t peer_info = {
+esp_now_peer_info_t erc_peer_info = {
     .channel = 0,
     .ifidx = ESP_IF_WIFI_STA,
     .encrypt = false,
@@ -11,38 +11,63 @@ esp_now_peer_info_t peer_info = {
     .peer_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 };
 
-/**
- * @brief struct for configuration of espnow_rc
- * 
- * @param mode mode, ERC_MODE_TX if transmitter, ERC_MODE_RX if receiver
- * 
- */
-typedef struct {
-    uint8_t mode;
-}erc_config_t;
+
+erc_dataframe_t incomingData; //buffer for incoming espnow messages
+erc_config_t erc_config; //config for espnow_rc
+bool erc_paired_flag = false; //flag for pairing status
+uint8_t mac[6]; //mac address of this device
+
+//********************************************************************************
+
+
+static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len)
+{
+    //receive from sender
+    incomingData = *(erc_dataframe_t*)data; 
+}
+
+void erc_rx_send_broadcast(void) {
+    erc_dataframe_t dataPacket;
+    esp_read_mac(dataPacket.sender_mac, ESP_MAC_WIFI_STA);
+    dataPacket.mode = ERC_MODE_RX;
+    dataPacket.tx_pairing_mode = 1;
+    esp_now_send(&mac_broadcast, (uint8_t *) &dataPacket, sizeof(dataPacket));
+}
+
+//task for periodic sending of broadcast pairing data with mac address
+void erc_rx_pairing_task(void *arg) {
+    erc_paired_flag = false;
+    while (!erc_paired_flag) {
+        erc_rx_send_broadcast();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+    vTaskDelete(NULL);
+}
 
 /**
- * @brief struct for 8 channel transmitter
+ * @brief starts pairing for receiver (broadcast mac address)
  * 
- * @param sender_mac mac address of sending device
- * @param mode mode, 0 if transmitter 1 if receiver
- * 
+ * @return esp_err_t 
  */
-typedef struct {
-    uint8_t sender_mac[6];
-    uint8_t mode;
+esp_err_t erc_rx_start_pairing(void) 
+{
+    if (erc_config.mode != ERC_MODE_RX) {
+        return ESP_FAIL;
+    }
+    BaseType_t err = xTaskCreate(erc_rx_pairing_task, "erc_rx_pairing_task", 2048, NULL, configMAX_PRIORITIES-4, NULL);
+    if (err != pdPASS) {
+        return ESP_FAIL;
+    } else {
+        return ESP_OK;
+    }
+}
 
-    int16_t ch0;
-    int16_t ch1;
-    int16_t ch2;
-    int16_t ch3;
-    int16_t ch4;
-    int16_t ch5;
-    int16_t ch6;
-    int16_t ch7;
-} erc_dataframe_t;
-
-void erc_init(void)
+/**
+ * @brief setup wifi for esp-now long range communication and read config
+ * 
+ * @param config config for espnow_rc
+ */
+void erc_init(erc_config_t *config)
 {
     nvs_flash_init();
     ESP_ERROR_CHECK(esp_netif_init());
@@ -54,11 +79,8 @@ void erc_init(void)
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(esp_wifi_set_protocol(ESP_IF_WIFI_STA, WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N|WIFI_PROTOCOL_LR) );
     ESP_ERROR_CHECK(esp_now_init());
+    ESP_ERROR_CHECK(esp_now_register_recv_cb(espnow_recv_cb));
+    erc_config = *config;
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
 }
 
-void erc_rx_send_pair(void) {
-    erc_dataframe_t dataPacket;
-    esp_read_mac(dataPacket.sender_mac, ESP_MAC_WIFI_STA);
-    dataPacket.mode = 1;
-    esp_now_send(broadcast_address, (uint8_t *) &dataPacket, sizeof(dataPacket));
-}
