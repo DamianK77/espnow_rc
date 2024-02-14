@@ -6,6 +6,7 @@
 #include "nvs_flash.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "string.h"
 
 /**
  * @brief struct for configuration of espnow_rc
@@ -20,15 +21,13 @@ typedef struct {
 /**
  * @brief struct for 8 channel transmitter
  * 
- * @param sender_mac mac address of sending device
- * @param mode mode, 0 if transmitter 1 if receiver
- * @param tx_pairing_mode pairing mode, 1 if ready to pair, 0 if not pairing
+ * @param mode mode of this device, 0 if transmitter 1 if receiver
+ * @param pairing_mode pairing mode, 1 if ready to pair, 0 if not pairing
  * 
  */
 typedef struct {
-    uint8_t sender_mac[6];
     uint8_t mode;
-    uint8_t tx_pairing_mode;
+    uint8_t pairing_mode;
 
     int16_t ch0;
     int16_t ch1;

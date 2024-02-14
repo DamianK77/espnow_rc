@@ -1,37 +1,72 @@
 #include <stdio.h>
 #include "espnow_rc.h"
 
-const uint8_t mac_broadcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-
 esp_now_peer_info_t erc_peer_info = {
     .channel = 0,
     .ifidx = ESP_IF_WIFI_STA,
     .encrypt = false,
     .lmk = {0},
-    .peer_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+    .peer_addr = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
 };
 
 
 erc_dataframe_t incomingData; //buffer for incoming espnow messages
 erc_config_t erc_config; //config for espnow_rc
 bool erc_paired_flag = false; //flag for pairing status
+bool erc_configured = false; //flag if component is configured
 uint8_t mac[6]; //mac address of this device
 
 //********************************************************************************
 
-
+//callback for received data over ESP-NOW
 static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len)
 {
     //receive from sender
     incomingData = *(erc_dataframe_t*)data; 
+
+    //debug print incoming data
+    printf("Received data: mode: %d, pairing_mode: %d, mac addr %02X:%02X:%02X:%02X:%02X:%02X\n", incomingData.mode, incomingData.pairing_mode, recv_info->src_addr[0], recv_info->src_addr[1], recv_info->src_addr[2], recv_info->src_addr[3], recv_info->src_addr[4], recv_info->src_addr[5]);
+
+    //procedure for RX mode of erc
+    if (erc_config.mode == ERC_MODE_RX && erc_configured)
+    {
+        //if device is not paired and received packet is in pairing mode and packet comes from a transmitter
+        if (!erc_paired_flag && incomingData.pairing_mode == 1 && incomingData.mode == ERC_MODE_TX)
+        {
+            uint8_t *peer_addr_temp = recv_info->src_addr;
+            memcpy(erc_peer_info.peer_addr, peer_addr_temp, sizeof(erc_peer_info.peer_addr));
+            printf("RX paired to TX with mac addr: %02X:%02X:%02X:%02X:%02X:%02X\n", erc_peer_info.peer_addr[0], erc_peer_info.peer_addr[1], erc_peer_info.peer_addr[2], erc_peer_info.peer_addr[3], erc_peer_info.peer_addr[4], erc_peer_info.peer_addr[5]);
+            erc_paired_flag = true;
+        }
+    }
+
+    //procedure for TX mode of erc
+    if (erc_config.mode == ERC_MODE_TX && erc_configured)
+    {
+        //if device is not paired and received packet is in pairing mode and if packet comes from a receiver
+        if (!erc_paired_flag && incomingData.pairing_mode == 1 && incomingData.mode == ERC_MODE_RX)
+        {
+            uint8_t *peer_addr_temp = recv_info->src_addr;
+            memcpy(erc_peer_info.peer_addr, peer_addr_temp, sizeof(erc_peer_info.peer_addr));
+            erc_dataframe_t sendback_frame;
+            sendback_frame.mode = erc_config.mode;
+            sendback_frame.pairing_mode = 1;
+            //send back a packet with mac addr to receiver
+            esp_now_send(erc_peer_info.peer_addr, (uint8_t *) &sendback_frame, sizeof(sendback_frame));
+            printf("TX paired to RX with mac addr: %02X:%02X:%02X:%02X:%02X:%02X\n", erc_peer_info.peer_addr[0], erc_peer_info.peer_addr[1], erc_peer_info.peer_addr[2], erc_peer_info.peer_addr[3], erc_peer_info.peer_addr[4], erc_peer_info.peer_addr[5]);
+            erc_paired_flag = true;
+        }
+    }
 }
+
+//RECEIVER FUNCTIONS
 
 void erc_rx_send_broadcast(void) {
     erc_dataframe_t dataPacket;
-    esp_read_mac(dataPacket.sender_mac, ESP_MAC_WIFI_STA);
     dataPacket.mode = ERC_MODE_RX;
-    dataPacket.tx_pairing_mode = 1;
-    esp_now_send(&mac_broadcast, (uint8_t *) &dataPacket, sizeof(dataPacket));
+    dataPacket.pairing_mode = 1;
+    esp_now_send(erc_peer_info.peer_addr, (uint8_t *) &dataPacket, sizeof(dataPacket));
+    printf("Sent broadcast pairing\n");
 }
 
 //task for periodic sending of broadcast pairing data with mac address
@@ -62,6 +97,8 @@ esp_err_t erc_rx_start_pairing(void)
     }
 }
 
+//TRANSMITTER FUNCTIONS
+
 /**
  * @brief setup wifi for esp-now long range communication and read config
  * 
@@ -81,6 +118,14 @@ void erc_init(erc_config_t *config)
     ESP_ERROR_CHECK(esp_now_init());
     ESP_ERROR_CHECK(esp_now_register_recv_cb(espnow_recv_cb));
     erc_config = *config;
+    erc_configured = true;
+    if (erc_config.mode == ERC_MODE_RX) {
+        printf("RX mode\n");
+    }
+    if (erc_config.mode == ERC_MODE_TX) {
+        printf("TX mode\n");
+    }
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    esp_now_add_peer(&erc_peer_info);
 }
 
