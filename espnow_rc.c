@@ -80,7 +80,7 @@ void erc_rx_pairing_task(void *arg) {
         erc_rx_send_broadcast();
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    printf("Paired\n");
+    printf("Paired, RX pairing task ended\n");
     vTaskDelete(NULL);
 }
 
