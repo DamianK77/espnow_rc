@@ -34,8 +34,10 @@ static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *
         if (!erc_paired_flag && incomingData.pairing_mode == 1 && incomingData.mode == ERC_MODE_TX)
         {
             uint8_t *peer_addr_temp = recv_info->src_addr;
+            esp_now_del_peer(erc_peer_info.peer_addr);
             memcpy(erc_peer_info.peer_addr, peer_addr_temp, sizeof(erc_peer_info.peer_addr));
             printf("RX paired to TX with mac addr: %02X:%02X:%02X:%02X:%02X:%02X\n", erc_peer_info.peer_addr[0], erc_peer_info.peer_addr[1], erc_peer_info.peer_addr[2], erc_peer_info.peer_addr[3], erc_peer_info.peer_addr[4], erc_peer_info.peer_addr[5]);
+            esp_now_add_peer(&erc_peer_info);
             erc_paired_flag = true;
         }
     }
@@ -46,8 +48,10 @@ static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *
         //if device is not paired and received packet is in pairing mode and if packet comes from a receiver
         if (!erc_paired_flag && incomingData.pairing_mode == 1 && incomingData.mode == ERC_MODE_RX)
         {
+            esp_now_del_peer(erc_peer_info.peer_addr);
             uint8_t *peer_addr_temp = recv_info->src_addr;
             memcpy(erc_peer_info.peer_addr, peer_addr_temp, sizeof(erc_peer_info.peer_addr));
+            esp_now_add_peer(&erc_peer_info);
             erc_dataframe_t sendback_frame;
             sendback_frame.mode = erc_config.mode;
             sendback_frame.pairing_mode = 1;
@@ -76,6 +80,7 @@ void erc_rx_pairing_task(void *arg) {
         erc_rx_send_broadcast();
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
+    printf("Paired\n");
     vTaskDelete(NULL);
 }
 
