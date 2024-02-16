@@ -1,6 +1,6 @@
 # ESP-NOW RC
 
-This is a library for connecting your two ESP32 devices via ESP-NOW in a manner similar to how standard rc transmitters work. It is designed to be easy to use and have auto-pairing capabilities (no need to know MAC addresses). 
+This is a ESP-IDF component for connecting your two ESP32 devices via ESP-NOW in a manner similar to how standard rc transmitters work. It is designed to be easy to use and have auto-pairing capabilities (no need to know MAC addresses). 
 
 ## Capabilities and features
 
