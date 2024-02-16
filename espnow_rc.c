@@ -22,10 +22,12 @@ uint8_t mac[6]; //mac address of this device
 static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len)
 {
     //receive from sender
-    incomingData = *(erc_dataframe_t*)data; 
+    incomingData = *(erc_dataframe_t*)data;
 
-    //debug print incoming data
-    printf("Received data: mode: %d, pairing_mode: %d, mac addr %02X:%02X:%02X:%02X:%02X:%02X\n", incomingData.mode, incomingData.pairing_mode, recv_info->src_addr[0], recv_info->src_addr[1], recv_info->src_addr[2], recv_info->src_addr[3], recv_info->src_addr[4], recv_info->src_addr[5]);
+    if (!erc_paired_flag) {
+        //debug print incoming data
+        printf("Received data: mode: %d, pairing_mode: %d, mac addr %02X:%02X:%02X:%02X:%02X:%02X\n", incomingData.mode, incomingData.pairing_mode, recv_info->src_addr[0], recv_info->src_addr[1], recv_info->src_addr[2], recv_info->src_addr[3], recv_info->src_addr[4], recv_info->src_addr[5]);
+    }
 
     //procedure for RX mode of erc
     if (erc_config.mode == ERC_MODE_RX && erc_configured)
@@ -63,18 +65,18 @@ static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *
     }
 }
 
-//RECEIVER FUNCTIONS
+//RECEIVER PAIRING FUNCTIONS
 
 void erc_rx_send_broadcast(void) {
     erc_dataframe_t dataPacket;
     dataPacket.mode = ERC_MODE_RX;
     dataPacket.pairing_mode = 1;
     esp_now_send(erc_peer_info.peer_addr, (uint8_t *) &dataPacket, sizeof(dataPacket));
-    printf("Sent broadcast pairing\n");
 }
 
 //task for periodic sending of broadcast pairing data with mac address
 void erc_rx_pairing_task(void *arg) {
+    printf("RX pairing task started\n");
     erc_paired_flag = false;
     while (!erc_paired_flag) {
         erc_rx_send_broadcast();
@@ -102,7 +104,28 @@ esp_err_t erc_rx_start_pairing(void)
     }
 }
 
-//TRANSMITTER FUNCTIONS
+/**
+ * @brief function for sending data to paired device (both RX and TX can send data)
+ * 
+ * @param data 
+ * @return esp_err_t 
+ */
+esp_err_t erc_send_data(erc_dataframe_t *data) {
+    if (!erc_paired_flag) {
+        return ESP_FAIL;
+    }
+    esp_err_t err = esp_now_send(erc_peer_info.peer_addr, (uint8_t *) data, sizeof(erc_dataframe_t));
+    return err;
+}
+
+/**
+ * @brief function to read receiver buffer to a struct provided in the argument
+ * 
+ * @param data - pointer to erc_dataframe_t struct to store received data
+ */
+void erc_receive_data(erc_dataframe_t *data) {
+    *data = incomingData;
+}
 
 /**
  * @brief setup wifi for esp-now long range communication and read config
