@@ -21,6 +21,8 @@ To configure this component first create a structure of type `erc_config_t`. It 
 
 If the ESP32 is in transmitter mode, it will automatically wait for a message from a receiver that is ready to pair. To start sending that message call `erc_rx_start_pairing` on the receiver configured ESP32. This will periodically send a broadcast looking for a free transmitter. If a transmitter is found, they will bind. This will happen automatically and does not need any extra functions. Beware that bind does not persist after reboot.
 
+You can also manually pair to any mac address you want using `erc_set_peer_mac` function by specifying the other ESP32's MAC address.
+
 ### Transmission
 
 To transmit and receive the data use functions `erc_send_data` and `erc_receive_data`. They can be used on both receiver and transmitter in order to send control signals to the receiver or back telemetry to the transmitter. Both use the `erc_dataframe_t` as the data carrier. After creating the dataframe and setting the ch0 to ch7 values (all are `int16_t`) send them using the function `erc_send_data`. Function `erc_receive_data` will write the most current received data to the dataframe given in the argument, which can be then used to control a device or display telemetry.

@@ -105,9 +105,21 @@ esp_err_t erc_rx_start_pairing(void)
 }
 
 /**
+ * @brief manually configure peer mac address (no pairing)
+ * 
+ * @param mac mac address of the peer to be added
+ * @return esp_err_t 
+ */
+esp_err_t erc_set_peer_mac(uint8_t *mac) {
+    erc_paired_flag = true;
+    memcpy(erc_peer_info.peer_addr, mac, sizeof(erc_peer_info.peer_addr));
+    return ESP_OK;
+}
+
+/**
  * @brief function for sending data to paired device (both RX and TX can send data)
  * 
- * @param data 
+ * @param data pointer to erc_dataframe_t struct to be sent
  * @return esp_err_t 
  */
 esp_err_t erc_send_data(erc_dataframe_t *data) {
@@ -121,7 +133,7 @@ esp_err_t erc_send_data(erc_dataframe_t *data) {
 /**
  * @brief function to read receiver buffer to a struct provided in the argument
  * 
- * @param data - pointer to erc_dataframe_t struct to store received data
+ * @param data pointer to erc_dataframe_t struct to store received data
  */
 void erc_receive_data(erc_dataframe_t *data) {
     *data = incomingData;

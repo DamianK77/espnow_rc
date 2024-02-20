@@ -46,3 +46,4 @@ void erc_init(erc_config_t *config);
 esp_err_t erc_rx_start_pairing(void);
 esp_err_t erc_send_data(erc_dataframe_t *data);
 void erc_receive_data(erc_dataframe_t *data);
+esp_err_t erc_set_peer_mac(uint8_t *mac);
