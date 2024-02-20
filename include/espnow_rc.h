@@ -12,10 +12,12 @@
  * @brief struct for configuration of espnow_rc
  * 
  * @param mode mode, ERC_MODE_TX if transmitter, ERC_MODE_RX if receiver
+ * @param pairing_method pairing method, ERC_PAIRING_METHOD_AUTO if auto pairing, ERC_PAIRING_METHOD_MANUAL if manual pairing
  * 
  */
 typedef struct {
     uint8_t mode;
+    uint8_t pairing_method;
 }erc_config_t;
 
 /**
@@ -41,6 +43,8 @@ typedef struct {
 
 #define ERC_MODE_TX 0
 #define ERC_MODE_RX 1
+#define ERC_PAIRING_METHOD_AUTO 0
+#define ERC_PAIRING_METHOD_MANUAL 1
 
 void erc_init(erc_config_t *config);
 esp_err_t erc_rx_start_pairing(void);
